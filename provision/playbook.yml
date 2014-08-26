@@ -1,0 +1,28 @@
+---
+- hosts: all
+  sudo: true
+  tasks:
+  - name: Install PHP
+    yum: pkg="{{ item }}"
+    with_items:
+    - php
+    - php-xml
+
+#    Note that we can't do this because it relies on a private repo
+#  - name: Install ocstoker
+
+  - name: Add ocstoker group
+    group: name=ocstoker system=yes
+
+  - name: Add ocstoker user
+    user: name=ocstoker group=ocstoker system=yes shell=/bin/bash createhome=yes
+
+  - name: Add /var/cache/openconext/stoker/edugain
+    file: name=/var/cache/openconext/stoker/edugain owner=ocstoker group=ocstoker state=directory
+
+  - name: Set cron job
+    cron:
+      name: ocstoker
+      user: ocstoker
+      special_time: hourly
+      job: "/usr/local/bin/ocstoker.phar stoke http://mds.edugain.org /var/cache/openconext/stoker/edugain --certPath=https://www.edugain.org/mds-2014.cer"

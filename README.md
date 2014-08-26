@@ -16,19 +16,23 @@ It's intent is to:
 
 ## Usage
 ```bash
-ocstoker http://mds.edugain.org /var/cache/openconext/stoker --certPath=https://www.edugain.org/mds-2014.cer
+ocstoker stoke http://mds.edugain.org /var/cache/openconext/stoker --certPath=https://www.edugain.org/mds-2014.cer
 ```
 Synchronises the SAML2 Metdata at mds.edugain.org to /var/cache/openconext/stoker.
 
 ## Install from build
 ```bash
-cd /usr/local/bin && wget https://github.com/ibuildingsnl/OpenConext-stoker/releases/
+cd /usr/local/bin && 
+sudo wget https://github.com/ibuildingsnl/OpenConext-stoker/releases/download/0.1.0/ocstoker.phar && 
+ln -s ocstoker.phar ocstoker 
 ```
 
 ## Install from source
 ```bash
-git clone 
-
+git clone git@github.com:ibuildingsnl/OpenConext-stoker.git &&
+cd OpenConext-stoker &&
+composer install &&
+./bin/ocstoker
 ```
 
 # Known issues

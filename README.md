@@ -16,7 +16,7 @@ It's intent is to:
 
 ## Usage
 ```bash
-ocstoker stoke http://mds.edugain.org /var/cache/openconext/stoker --certPath=https://www.edugain.org/mds-2014.cer
+ocstoker stoke http://mds.edugain.org /var/cache/openconext/stoker/edugain --certPath=https://www.edugain.org/mds-2014.cer
 ```
 Synchronises the SAML2 Metdata at mds.edugain.org to /var/cache/openconext/stoker.
 
@@ -24,7 +24,7 @@ Synchronises the SAML2 Metdata at mds.edugain.org to /var/cache/openconext/stoke
 ```bash
 cd /usr/local/bin && 
 sudo wget https://github.com/ibuildingsnl/OpenConext-stoker/releases/download/0.1.0/ocstoker.phar && 
-ln -s ocstoker.phar ocstoker 
+sudo ln -s ocstoker.phar ocstoker 
 ```
 
 ## Install from source

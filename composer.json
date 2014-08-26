@@ -1,0 +1,13 @@
+{
+    "name": "openconext/stoker",
+    "license": "APACHE-2",
+    "type": "project",
+    "description": "Metadata stoker for OpenConext EngineBlock",
+    "autoload": {
+        "psr-4": { "OpenConext\\Stoker\\": "src/" }
+    },
+    "require": {
+        "cilex/cilex": "~1.1",
+        "ass/xmlsecurity": "~1.1"
+    }
+}

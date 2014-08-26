@@ -1,0 +1,12 @@
+#!/usr/bin/env php
+<?php
+$autoload = __DIR__ . '/../vendor/autoload.php';
+if (!file_exists($autoload)) {
+    echo "Please run `php composer.phar install` first." . PHP_EOL;
+    exit(1);
+}
+require_once $autoload;
+
+$app = new \Cilex\Application('OpenConext Stoker', '@package_version@');
+$app->command(new \OpenConext\Stoker\Command\StokeCommand());
+$app->run();

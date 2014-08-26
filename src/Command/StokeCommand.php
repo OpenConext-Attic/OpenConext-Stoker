@@ -233,10 +233,10 @@ class StokeCommand extends Command
      */
     private function durationToUnixTimestamp($dateInterval)
     {
-        $reference = new \DateTimeImmutable;
+        $reference = new \DateTime();
         $endTime = $reference->add(new \DateInterval($dateInterval));
 
-        return $endTime->getTimestamp() - $reference->getTimestamp();
+        return $endTime->getTimestamp() - time();
     }
 
     private function downloadLargeFile($from, $to)

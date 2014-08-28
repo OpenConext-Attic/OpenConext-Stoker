@@ -36,4 +36,4 @@ composer install &&
 ```
 
 # Known issues
-We currently only support signed RSA-SHA1 metadata documents, pull requests welcome!
+We currently only support signed RSA-SHA256 metadata documents, pull requests welcome!

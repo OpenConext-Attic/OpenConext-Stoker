@@ -412,6 +412,7 @@ class StokeCommand extends Command
 
         $types = array();
         $displayNames = array();
+
         if ($xpath->query('/md:EntityDescriptor/md:IDPSSODescriptor')->length > 0) {
             $types[] = 'idp';
             /** @var DOMNode[] $displayNameNodes */
@@ -436,8 +437,27 @@ class StokeCommand extends Command
                 $displayNames[$lang] = $content;
             }
         }
+
         if (empty($types)) {
             throw new RuntimeException("Entity '$entityId' is neither idp or sp!");
+        }
+
+        // If the SP / IDP doesn't have a DisplayName in it's role (which is not required, it's a SHOULD) we
+        // try the OrganizationDisplayName.
+        if (empty($displayNames)) {
+            $displayNameNodes = $xpath->query('/md:EntityDescriptor/md:OrganizationDisplayName');
+            /** @var DOMNode[] $displayNameNodes */
+            foreach ($displayNameNodes as $displayNameNode) {
+                $lang = $displayNameNode->attributes->getNamedItem('lang')->textContent;
+                $content = $displayNameNode->textContent;
+                $displayNames[$lang] = $content;
+            }
+        }
+
+        // If we don't even have an OrganizationDisplayName then we just use the entityID which is guaranteed to
+        // be there (also guaranteed not to be user friendly, but it's better than nothing).
+        if (empty($displayNames)) {
+            $displayNames[] = $entityId;
         }
 
         $displayNameEn = $this->pickDisplayName($displayNames, array('en', 'nl'));

@@ -428,7 +428,7 @@ class StokeCommand extends Command
             $types[] = 'sp';
             /** @var DOMNode[] $displayNameNodes */
             $displayNameNodes = $xpath->query(
-                '/md:EntityDescriptor/md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName'
+                '/md:EntityDescriptor/md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName'
             );
             foreach ($displayNameNodes as $displayNameNode) {
                 $lang = $displayNameNode->attributes->getNamedItem('lang')->textContent;

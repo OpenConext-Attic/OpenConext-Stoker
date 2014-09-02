@@ -8,6 +8,10 @@
     },
     "require": {
         "cilex/cilex": "~1.1",
-        "ass/xmlsecurity": "~1.1"
+        "ass/xmlsecurity": "~1.1",
+        "monolog/monolog": "~1.10",
+        "symfony/monolog-bridge": "~2.1",
+        "symfony/event-dispatcher": "~2.5",
+        "phpunit/php-timer": "~1.0"
     }
 }

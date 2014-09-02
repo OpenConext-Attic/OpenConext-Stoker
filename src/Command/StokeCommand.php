@@ -460,7 +460,7 @@ class StokeCommand extends Command
     protected function pickDisplayName(array $displayNames, array $options)
     {
         foreach ($options as $option) {
-            if ($displayNames[$option]) {
+            if (isset($displayNames[$option])) {
                 return $displayNames[$option];
             }
         }

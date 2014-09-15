@@ -2,27 +2,33 @@
 
 namespace OpenConext\Stoker\Command;
 
-use ass\XmlSecurity\DSig;
-use ass\XmlSecurity\Key;
-use Cilex\Command\Command;
 use DateInterval;
 use DateTime;
 use DOMDocument;
 use DOMNode;
 use DOMXPath;
 use InvalidArgumentException;
+use OpenConext\Component\StokerMetadata\Stoker\MetadataIndex\Entity;
+use RuntimeException;
+use XMLReader;
+
+use ass\XmlSecurity\DSig;
+use ass\XmlSecurity\Key;
+
+use Cilex\Command\Command;
+
 use Monolog\ErrorHandler;
 use Monolog\Handler\NativeMailerHandler;
 use Monolog\Handler\SyslogHandler;
 use Monolog\Logger;
-use OpenConext\Stoker\Command\MetadataIndex\Entity;
-use RuntimeException;
+
+use OpenConext\Component\StokerkMetadata\Stoker\MetadataIndex;
+
 use Symfony\Bridge\Monolog\Handler\ConsoleHandler;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use XMLReader;
 
 /**
  * Stoke the SAML2 fire.

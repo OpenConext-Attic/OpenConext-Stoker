@@ -1,6 +1,6 @@
 OpenConext Stoker
 =================
-![Image of a stoker putting coal into an engine](http://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Baureihe52Heizer.jpg/203px-Baureihe52Heizer.jpg)
+![Image of a stoker putting coal into an engine](http://upload.wikimedia.org/wikipedia/commons/2/22/Baureihe52Heizer.jpg)
 > Fireman or stoker is the job title for someone whose job is to tend the fire for the running of a steam engine.
 >
 > On steam locomotives the term fireman is usually used, while on steamships and stationary steam engines, such as those driving saw mills, the term is usually stoker (although the British Merchant Navy did use fireman). The German word Heizer is equivalent. Much of the job is hard physical labor, such as shoveling fuel, typically coal, into the engine's firebox.

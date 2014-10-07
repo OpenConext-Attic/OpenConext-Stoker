@@ -37,6 +37,7 @@ composer install &&
 
 # Output format
 We output 2 things:
+
 1. The index, which contains just a list of all the entities along with some normalised data.
 2. Per entity the relevant SAML2 EntityDescriptor.
 

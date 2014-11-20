@@ -44,9 +44,9 @@ curl -sS https://getcomposer.org/installer | php && # see https://getcomposer.or
 curl -LSs http://box-project.org/installer.php | php && # see https://github.com/box-project/box2#as-a-phar-recommended
 php composer.phar install &&
 php box.phar build &&
-sudo mv ocstoker.phar /usr/local/bin &&
+sudo mv -f ocstoker.phar /usr/local/bin &&
 cd /usr/local/bin &&
-sudo ln -s ocstoker.phar ocstoker &&
+sudo ln -sf ocstoker.phar ocstoker &&
 cd - &&
 cd .. &&
 rm -rf OpenConext-stoker

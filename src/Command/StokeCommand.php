@@ -325,14 +325,17 @@ class StokeCommand extends Command
         do {
             $entityXml = $reader->readOuterXml();
 
-            // Get the entityID for the Entity
+            // Transform the XML to an Entity model.
             $entity = $this->getEntityFromXml($entityXml);
-            $metadataIndex->addEntity($entity);
 
-            $filePath = $this->getFilePathForEntityId($entity->entityId);
+            if ($entity) {
+                $metadataIndex->addEntity($entity);
 
-            if (!file_exists($filePath) || md5($entityXml) !== md5_file($filePath)) {
-                file_put_contents($filePath, $entityXml);
+                $filePath = $this->getFilePathForEntityId($entity->entityId);
+
+                if (!file_exists($filePath) || md5($entityXml) !== md5_file($filePath)) {
+                    file_put_contents($filePath, $entityXml);
+                }
             }
         }
         while ($reader->next('EntityDescriptor'));
@@ -439,7 +442,8 @@ class StokeCommand extends Command
         }
 
         if (empty($types)) {
-            throw new RuntimeException("Entity '$entityId' is neither idp or sp!");
+            $this->logger->addNotice("Entity '$entityId' is neither idp or sp!");
+            return;
         }
 
         // If the SP / IDP doesn't have a DisplayName in it's role (which is not required, it's a SHOULD) we

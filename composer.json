@@ -13,10 +13,6 @@
         "symfony/monolog-bridge": "~2.1",
         "symfony/event-dispatcher": "~2.5",
         "phpunit/php-timer": "~1.0",
-        "openconext/stoker-metadata": "dev-master"
-    },
-    "repositories": [{
-        "type": "vcs",
-        "url": "https://github.com/ibuildingsnl/OpenConext-stoker-metadata"
-    }]
+        "openconext/stoker-metadata": "~0.1"
+    }
 }

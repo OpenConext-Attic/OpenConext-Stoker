@@ -23,16 +23,33 @@ Synchronises the SAML2 Metdata at mds.edugain.org to /var/cache/openconext/stoke
 ## Install from build
 ```bash
 cd /usr/local/bin && 
-sudo wget https://github.com/ibuildingsnl/OpenConext-stoker/releases/download/0.3.2/ocstoker.phar && 
-sudo ln -s ocstoker.phar ocstoker 
+sudo wget https://github.com/OpenConext/OpenConext-stoker/releases/download/0.3.2/ocstoker.phar && 
+sudo ln -s ocstoker.phar ocstoker &&
+cd -
 ```
 
 ## Install from source
+
+Requires:
+- php >= 5.3.3
+- git
+- curl
+- writable directory (/tmp?)
+- sudo rights to /usr/local/bin
+
 ```bash
-git clone git@github.com:ibuildingsnl/OpenConext-stoker.git &&
+git clone git@github.com:OpenConext/OpenConext-stoker.git &&
 cd OpenConext-stoker &&
-composer install &&
-./bin/ocstoker
+curl -sS https://getcomposer.org/installer | php && # see https://getcomposer.org/download/
+curl -LSs http://box-project.org/installer.php | php && # see https://github.com/box-project/box2#as-a-phar-recommended
+php composer.phar install &&
+php box.phar build &&
+sudo mv ocstoker.phar /usr/local/bin &&
+cd /usr/local/bin &&
+sudo ln -s ocstoker.phar ocstoker &&
+cd - &&
+cd .. &&
+rm -rf OpenConext-stoker
 ```
 
 # Output format

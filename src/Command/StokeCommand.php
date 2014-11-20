@@ -8,7 +8,8 @@ use DOMDocument;
 use DOMNode;
 use DOMXPath;
 use InvalidArgumentException;
-use OpenConext\Component\StokerMetadata\Stoker\MetadataIndex\Entity;
+use OpenConext\Component\StokerMetadata\MetadataIndex;
+use OpenConext\Component\StokerMetadata\MetadataIndex\Entity;
 use RuntimeException;
 use XMLReader;
 
@@ -21,8 +22,6 @@ use Monolog\ErrorHandler;
 use Monolog\Handler\NativeMailerHandler;
 use Monolog\Handler\SyslogHandler;
 use Monolog\Logger;
-
-use OpenConext\Component\StokerkMetadata\Stoker\MetadataIndex;
 
 use Symfony\Bridge\Monolog\Handler\ConsoleHandler;
 use Symfony\Component\Console\Input\InputArgument;
@@ -70,11 +69,6 @@ class StokeCommand extends Command
      * @var Logger
      */
     private $logger;
-
-    /**
-     * @var DateTime
-     */
-    private $startTime;
 
     /**
      * {@inheritdoc}
@@ -349,7 +343,7 @@ class StokeCommand extends Command
     }
 
     /**
-     * @param DateInterval $dateInterval
+     * @param mixed $dateInterval
      * @return int seconds
      */
     private function durationToUnixTimestamp($dateInterval)
@@ -495,7 +489,7 @@ class StokeCommand extends Command
     }
 
     /**
-     * @param $entityId
+     * @param string $entityId
      * @return string
      */
     private function getFilePathForEntityId($entityId)

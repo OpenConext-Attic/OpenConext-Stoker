@@ -77,8 +77,7 @@ The Index always stored at ```metadata.index.json``` contains the following info
   "processed": "2014-09-12T16:22:16+02:00",
   "entities": [
     {
-      "entityId": "
-      ",
+      "entityId": "http://adfs.tue.nl/adfs/services/trust",
       "types": [
         "idp"
       ],

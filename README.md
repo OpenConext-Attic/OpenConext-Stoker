@@ -24,6 +24,7 @@ Synchronises the SAML2 Metdata at mds.edugain.org to /var/cache/openconext/stoke
 ```bash
 cd /usr/local/bin && 
 sudo wget -q https://github.com/OpenConext/OpenConext-stoker/releases/download/0.4.1/ocstoker.phar -O ocstoker.phar && 
+sudo chmod a+x ocstoker.phar &&
 sudo ln -sf ocstoker.phar ocstoker &&
 cd -
 ```

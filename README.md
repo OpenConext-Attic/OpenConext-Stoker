@@ -61,6 +61,7 @@ We output 2 things:
 Further described hereafter.
 
 ## 1. The Index
+![](http://img1.wikia.nocookie.net/__cb20090301182209/halo/images/7/79/Contana_with_Index.jpg)
 The Index always stored at ```metadata.index.json``` contains the following information:
 * ```processed```: ISO 8601 datetime that these entities were processed.
 * ```entities```: Array with all entities, per entity:

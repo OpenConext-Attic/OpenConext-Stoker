@@ -535,15 +535,11 @@ class StokeCommand extends Command
 					'/md:EntityDescriptor/md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo'
 				);
 			
-			foreach ($logoNodes as $oldlogoNode) {
+			foreach ($logoNodes as $oldLogoNode) {
 
-				$logo = array();
-
-				var_dump($oldlogoNode);
-
-				$content = $oldlogoNode->textContent;
-				$logo["width"] = $oldlogoNode->attributes->getNamedItem('width')->textContent;
-				$logo["height"] = $oldlogoNode->attributes->getNamedItem('height')->textContent;
+				$content = $oldLogoNode->textContent;
+				$logo["width"] = $oldLogoNode->attributes->getNamedItem('width')->textContent;
+				$logo["height"] = $oldLogoNode->attributes->getNamedItem('height')->textContent;
 				
 				$logoName = md5($entityId) ."_".$logo["width"]."x".$logo["height"];
 
@@ -586,18 +582,28 @@ class StokeCommand extends Command
 				} 		
 				
 				// Load the $parent document fragment into the current document
-				$newImage = $document->createElement("mdui:Logo"); 
-				$newImage->createTextNode($logoBaseURL.$logoName.".".$logoExtention); 
-				$newImage->setAttribute("width", $oldlogoNode->attributes->getNamedItem('width')->textContent);
-				$newImage->setAttribute("height", $oldlogoNode->attributes->getNamedItem('height')->textContent);
+				$newImage = $document->createElement("mdui:Logo", $logoBaseURL.$logoName.".".$logoExtention); 
 
-				var_dump($newImage);
+				$newImageWidth = $document->createAttribute('width');
+				$newImageHeight = $document->createAttribute('height');
+				
+				$newImageWidth->value = $oldLogoNode->attributes->getNamedItem('width')->textContent;
+				$newImageHeight->value = $oldLogoNode->attributes->getNamedItem('height')->textContent;
+
+				$newImage->appendChild($newImageWidth);
+				$newImage->appendChild($newImageHeight);
+
+				$newLogoNode = $document->importNode($newImage, true);
+
+
+				var_dump($oldLogoNode);
+				var_dump($newLogoNode);
+
+				// Replace
+				$replacing = $oldLogoNode->parentNode->replaceChild($newLogoNode, $oldLogoNode);
+
 
 				exit();
-
-// Replace
-$oldLogoNode->parentNode->replaceChild($newLogoNode, $oldLogoNode);
-
 				
 
 				$logo["imageFile"] = $logoName.".".$logoExtention;
@@ -605,7 +611,7 @@ $oldLogoNode->parentNode->replaceChild($newLogoNode, $oldLogoNode);
 			}
 			
 		}
-        return $entity;
+        return $entityXml;
     }
 
 

@@ -103,9 +103,11 @@ class StokeCommand extends Command
         );
 
         $this->verifyDestinationDirectory($directory);
+	    $this->metadataDirectory = realpath($directory) . DIRECTORY_SEPARATOR;
+
         $this->verifyMetadataPath($metadataPath);
         $this->verifyCertPath($caPath);
-
+ 
         $metadataIndex = MetadataIndex::load($this->metadataDirectory);
         if (!$metadataIndex) {
             $this->logger->addDebug("(Re)newing caching because no metadata index yet.");
@@ -187,7 +189,10 @@ class StokeCommand extends Command
                 "'$directory' is not a writable path."
             );
         }
-        $this->metadataDirectory = realpath($directory) . DIRECTORY_SEPARATOR;
+        //$this->metadataDirectory = realpath($directory) . DIRECTORY_SEPARATOR;
+
+		// If I get till here the dir was created without any errors
+		return true;
     }
 
     private function verifyCertPath($certPath)
@@ -323,11 +328,18 @@ class StokeCommand extends Command
         }
 
         do {
-            $entityXml = $reader->readOuterXml();
+            $entitySourceXml = $reader->readOuterXml();
 
             // Transform the XML to an Entity model.
-            $entity = $this->getEntityFromXml($entityXml);
+            $entity = $this->getEntityFromXml($entitySourceXml);
 
+			// Create a cache for the logos - (!) this involves modifying the entityXML to reflect the new logo file locations
+			$entityXml =  $this->createLogoCache($entitySourceXml, "/logoURL/");
+
+			var_dump($entity);
+			var_dump($entityXml);
+
+			exit();
             if ($entity) {
                 $metadataIndex->addEntity($entity);
 
@@ -416,6 +428,7 @@ class StokeCommand extends Command
         $types = array();
         $displayNames = array();
 
+		// Handle IdPs
         if ($xpath->query('/md:EntityDescriptor/md:IDPSSODescriptor')->length > 0) {
             $types[] = 'idp';
             /** @var DOMNode[] $displayNameNodes */
@@ -428,6 +441,7 @@ class StokeCommand extends Command
                 $displayNames[$lang] = $content;
             }
         }
+ 
         if ($xpath->query('/md:EntityDescriptor/md:SPSSODescriptor')->length > 0) {
             $types[] = 'sp';
             /** @var DOMNode[] $displayNameNodes */
@@ -476,10 +490,124 @@ class StokeCommand extends Command
                 'displayNameEn'=>$displayNameEn
             )
         );
-
+        
         $entity = new Entity($entityId, $types, $displayNameEn, $displayNameNl);
         return $entity;
     }
+
+/**
+
+    /**
+     * This function creates a cache for the logos in entity metadata
+     * EduGain currently also supports embedded images in entity metadata which OpenConext cannot handle
+     * Embedded images will be written to file, URL based logos will be downloaded.
+     * Note that all the image will be put into the logos directory in the metadata. The logoBaseURL param must point to that directory
+     * The function return entityXML with the logo locations adapted for the cache.
+     *
+     * @param string $entityXml
+     * @param string $logoBaseURL
+     * @return $entityXml
+     * @throws RuntimeException
+     */
+    private function createLogoCache($entityXml, $logoBaseURL)
+    {
+        $document = new DOMDocument();
+        $document->loadXML($entityXml);
+
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('md', 'urn:oasis:names:tc:SAML:2.0:metadata');
+        $xpath->registerNamespace('mdui', 'urn:oasis:names:tc:SAML:metadata:ui');
+        
+        $entityIdResults = $xpath->query('/md:EntityDescriptor/@entityID');
+        if ($entityIdResults->length !== 1) {
+            throw new RuntimeException(
+                "{$entityIdResults->length} results found for an entityID attribute on: " . $entityXml
+            );
+        }
+        $entityId = $entityIdResults->item(0)->nodeValue;
+
+        $logos = array();
+
+		// Handle IdPs only
+        if ($xpath->query('/md:EntityDescriptor/md:IDPSSODescriptor')->length > 0) {
+		
+			$logoNodes = $xpath->query(
+					'/md:EntityDescriptor/md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo'
+				);
+			
+			foreach ($logoNodes as $oldlogoNode) {
+
+				$logo = array();
+
+				var_dump($oldlogoNode);
+
+				$content = $oldlogoNode->textContent;
+				$logo["width"] = $oldlogoNode->attributes->getNamedItem('width')->textContent;
+				$logo["height"] = $oldlogoNode->attributes->getNamedItem('height')->textContent;
+				
+				$logoName = md5($entityId) ."_".$logo["width"]."x".$logo["height"];
+
+				// make sure the logo directory exists.
+				$logoDirectory = $this->metadataDirectory . "/logos/";		
+				$this->verifyDestinationDirectory($logoDirectory);
+
+				// handle the image
+				$contentPieces = explode(":", $content,10);
+				if ($contentPieces[0] == "data") {
+					// handle embedded image
+					$logoBlob = explode(";", $content,10);
+
+					// Calculate path
+					$logoBlobHeaderParts = explode("/", $logoBlob[0]);
+					$logoExtention = $logoBlobHeaderParts[1];
+					$imageFileLocation = $logoDirectory . $logoName.".".$logoExtention;
+
+					// write down blob into an image file
+					$imageData = explode(',', $content);
+					file_put_contents($imageFileLocation, base64_decode($imageData[1]));
+					
+					$this->logger->notice("Found embedded image(s) for entity ".$entityId.", converting to file at location ". $imageFileLocation);
+
+				} else {
+					// handle URL (http or https)
+					$logoLocation = $content;
+
+					$path_parts = pathinfo($logoLocation);
+					$logoExtention = $path_parts['extension'];
+					$imageFileLocation = $logoDirectory . $logoName.".".$logoExtention;
+
+					// download URL and replace URL location in Metadata.
+					if ($this->urlExists($logoLocation)) {
+					  $this->downloadLargeFile($logoLocation, $imageFileLocation);
+					  $this->logger->notice("Found image URL(s) for entity ".$entityId.", saving to file at location ". $imageFileLocation);
+					} else {
+					  $this->logger->notice("WARN: Found image URL(s) for entity ".$entityId.", but could not retrieve the file at location ". $logoLocation);	
+					}
+				} 		
+				
+				// Load the $parent document fragment into the current document
+				$newImage = $document->createElement("mdui:Logo"); 
+				$newImage->createTextNode($logoBaseURL.$logoName.".".$logoExtention); 
+				$newImage->setAttribute("width", $oldlogoNode->attributes->getNamedItem('width')->textContent);
+				$newImage->setAttribute("height", $oldlogoNode->attributes->getNamedItem('height')->textContent);
+
+				var_dump($newImage);
+
+				exit();
+
+// Replace
+$oldLogoNode->parentNode->replaceChild($newLogoNode, $oldLogoNode);
+
+				
+
+				$logo["imageFile"] = $logoName.".".$logoExtention;
+				$logos[] = $logo; 
+			}
+			
+		}
+        return $entity;
+    }
+
 
     protected function pickDisplayName(array $displayNames, array $options)
     {

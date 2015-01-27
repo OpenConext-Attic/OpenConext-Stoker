@@ -82,6 +82,7 @@ class StokeCommand extends Command
             ->addArgument('directory', InputArgument::REQUIRED, 'Where do I put my output?')
             ->addOption('certPath', 'cp', InputOption::VALUE_REQUIRED, 'Path to trusted certificate to verify metadata with, e.g. /etc/stoker/mds.edugain.org or even https://www.edugain.org/mds-2014.cer')
             ->addOption('mailErrors', 'me', InputOption::VALUE_REQUIRED, 'Mail any errors that occur to this email address')
+            ->addOption('outputURL', 'opu', InputOption::VALUE_REQUIRED, 'What is the URL that will point to the metadata output? If I am not provided, I will not create a logo cache!')
         ;
     }
 
@@ -94,12 +95,14 @@ class StokeCommand extends Command
         $metadataPath   = $input->getArgument('metadataPath');
         $caPath         = $input->getOption('certPath');
         $mailErrors     = $input->getOption('mailErrors');
+        $outputURL     = $input->getOption('outputURL');
+
 
         $this->initLogger($output, $mailErrors);
 
         $this->logger->addNotice(
             "Starting Stoke",
-            array('directory' => $directory, 'metadatPath' => $metadataPath, 'caPath' => $caPath, 'mailErrors' => $mailErrors)
+            array('directory' => $directory, 'metadatPath' => $metadataPath, 'caPath' => $caPath, 'mailErrors' => $mailErrors, 'outputURL' => $outputURL)
         );
 
         $this->verifyDestinationDirectory($directory);
@@ -107,7 +110,16 @@ class StokeCommand extends Command
 
         $this->verifyMetadataPath($metadataPath);
         $this->verifyCertPath($caPath);
- 
+
+		if (!isset($outputURL)) {
+			$this->logger->addNotice("outputURL not set: Running Stoke without creating logo cache!");
+			$this->createLogoCache = false;
+		} else {
+			# check if URL is valid format, and add final / if needed
+			$this->outputURL=$outputURL;
+			$this->createLogoCache = true;
+		}
+		
         $metadataIndex = MetadataIndex::load($this->metadataDirectory);
         if (!$metadataIndex) {
             $this->logger->addDebug("(Re)newing caching because no metadata index yet.");
@@ -328,13 +340,15 @@ class StokeCommand extends Command
         }
 
         do {
-            $entitySourceXml = $reader->readOuterXml();
+            $entityXml = $reader->readOuterXml();
 
             // Transform the XML to an Entity model.
-            $entity = $this->getEntityFromXml($entitySourceXml);
+            $entity = $this->getEntityFromXml($entityXml);
 
-			// Create a cache for the logos - (!) this involves modifying the entityXML to reflect the new logo file locations
-			$entityXml =  $this->createLogoCache($entitySourceXml, "/logoURL/");
+			if ($this->createLogoCache) {
+				// Create a cache for the logos - (!) this involves modifying the entityXML to reflect the new logo file locations
+				$entityXml =  $this->createLogoCache($entityXml, $this->outputURL);
+			}
 
             if ($entity) {
                 $metadataIndex->addEntity($entity);
@@ -540,7 +554,7 @@ class StokeCommand extends Command
 				$logoName = md5($entityId) ."_".$logo["width"]."x".$logo["height"];
 
 				// make sure the logo directory exists.
-				$logoDirectory = $this->metadataDirectory . "/logos/";		
+				$logoDirectory = $this->getFilePathForLogo($entityId);	
 				$this->verifyDestinationDirectory($logoDirectory);
 
 				// handle the image
@@ -578,7 +592,9 @@ class StokeCommand extends Command
 				} 		
 				
 				// Load the $parent document fragment into the current document
-				$newImage = $document->createElement("mdui:Logo", $logoBaseURL.$logoName.".".$logoExtention); 
+				
+				
+				$newImage = $document->createElement("mdui:Logo", $this->getURLPathForLogo($entityId).$logoName.".".$logoExtention); 
 
 				$newImageWidth = $document->createAttribute('width');
 				$newImageHeight = $document->createAttribute('height');
@@ -618,7 +634,29 @@ class StokeCommand extends Command
      */
     private function getFilePathForEntityId($entityId)
     {
-        $filePath = $this->metadataDirectory . md5($entityId) . '.xml';
+		$md5entityID =  md5($entityId);
+		
+        $filePath = $this->metadataDirectory  . $md5entityID . '.xml';
         return $filePath;
     }
+    
+    private function getFilePathForLogo($entityId)
+    {
+        $md5entityID =  md5($entityId);
+    
+        // Create subdirs based on the first letter of the md5 of the entityID to avoid filling the dir with too many files
+        // Note the logos are always in the logos subdir
+        $filePath = $this->metadataDirectory. "logos/" . $md5entityID[0] . "/";
+        return $filePath;
+    }
+    
+    private function getURLPathForLogo($entityId)
+    {
+        $md5entityID =  md5($entityId);
+        
+        // getFilePathForLogo() has created subdirs based on the first letter of the md5 of the entityID to avoid filling the dir with too many files
+        $filePath = $this->outputURL . "logos/" . $md5entityID[0] . "/";
+        return $filePath;
+    }
+    
 }

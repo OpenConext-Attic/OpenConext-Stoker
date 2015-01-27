@@ -336,10 +336,6 @@ class StokeCommand extends Command
 			// Create a cache for the logos - (!) this involves modifying the entityXML to reflect the new logo file locations
 			$entityXml =  $this->createLogoCache($entitySourceXml, "/logoURL/");
 
-			var_dump($entity);
-			var_dump($entityXml);
-
-			exit();
             if ($entity) {
                 $metadataIndex->addEntity($entity);
 
@@ -595,23 +591,13 @@ class StokeCommand extends Command
 
 				$newLogoNode = $document->importNode($newImage, true);
 
-
-				var_dump($oldLogoNode);
-				var_dump($newLogoNode);
-
 				// Replace
 				$replacing = $oldLogoNode->parentNode->replaceChild($newLogoNode, $oldLogoNode);
-
-
-				exit();
-				
-
-				$logo["imageFile"] = $logoName.".".$logoExtention;
-				$logos[] = $logo; 
 			}
 			
 		}
-        return $entityXml;
+		
+        return $document->saveXML();
     }
 
 

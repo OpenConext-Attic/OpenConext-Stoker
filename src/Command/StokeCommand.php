@@ -184,7 +184,7 @@ class StokeCommand extends Command
     {
         if (!file_exists($directory)) {
             $this->logger->notice("Directory '$directory' does not exist yet, creating.");
-            $isCreated = @mkdir($directory, 0700, true);
+            $isCreated = @mkdir($directory, 0755, true);
             if (!$isCreated) {
                 throw new InvalidArgumentException(
                     "'$directory' does not exist and can not be created by the current user. Try: sudo mkdir -p \"$directory\""

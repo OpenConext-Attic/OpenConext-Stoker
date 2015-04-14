@@ -565,8 +565,13 @@ class StokeCommand extends Command
 
 					// Calculate path
 					$logoBlobHeaderParts = explode("/", $logoBlob[0]);
-					$logoExtention = $logoBlobHeaderParts[1];
-					$imageFileLocation = $logoDirectory . $logoName.".".$logoExtention;
+					if (isset($logoBlobHeaderParts[1])) {
+						$logoExtention = $logoBlobHeaderParts[1];
+						$logoFilename = $logoName.".".$logoExtention;
+					} else {
+						$logoFilename = $logoName;
+					}
+					$imageFileLocation = $logoDirectory . $logoFilename;
 
 					// write down blob into an image file
 					$imageData = explode(',', $content);
@@ -579,8 +584,14 @@ class StokeCommand extends Command
 					$logoLocation = $content;
 
 					$path_parts = pathinfo($logoLocation);
-					$logoExtention = $path_parts['extension'];
-					$imageFileLocation = $logoDirectory . $logoName.".".$logoExtention;
+					if (isset($path_parts['extension'])) {
+						$logoFilename = $logoName.".".$path_parts['extension'];
+					} else {
+						print("Woeps, image url without extension: $logoLocation\n");
+						$logoFilename = $logoName;
+					}
+					$imageFileLocation = $logoDirectory . $logoFilename;
+
 
 					// download URL and replace URL location in Metadata.
 					if ($this->urlExists($logoLocation)) {
@@ -594,7 +605,7 @@ class StokeCommand extends Command
 				// Load the $parent document fragment into the current document
 				
 				
-				$newImage = $document->createElement("mdui:Logo", $this->getURLPathForLogo($entityId).$logoName.".".$logoExtention); 
+				$newImage = $document->createElement("mdui:Logo", $this->getURLPathForLogo($entityId).$logoFilename); 
 
 				$newImageWidth = $document->createAttribute('width');
 				$newImageHeight = $document->createAttribute('height');

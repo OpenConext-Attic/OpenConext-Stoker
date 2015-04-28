@@ -82,6 +82,7 @@ class StokeCommand extends Command
             ->addArgument('directory', InputArgument::REQUIRED, 'Where do I put my output?')
             ->addOption('certPath', 'cp', InputOption::VALUE_REQUIRED, 'Path to trusted certificate to verify metadata with, e.g. /etc/stoker/mds.edugain.org or even https://www.edugain.org/mds-2014.cer')
             ->addOption('mailErrors', 'me', InputOption::VALUE_REQUIRED, 'Mail any errors that occur to this email address')
+            ->addOption('outputURL', 'opu', InputOption::VALUE_REQUIRED, 'What is the URL that will point to the metadata output? If I am not provided, I will not create a logo cache!')
         ;
     }
 
@@ -94,18 +95,31 @@ class StokeCommand extends Command
         $metadataPath   = $input->getArgument('metadataPath');
         $caPath         = $input->getOption('certPath');
         $mailErrors     = $input->getOption('mailErrors');
+        $outputURL     = $input->getOption('outputURL');
+
 
         $this->initLogger($output, $mailErrors);
 
         $this->logger->addNotice(
             "Starting Stoke",
-            array('directory' => $directory, 'metadatPath' => $metadataPath, 'caPath' => $caPath, 'mailErrors' => $mailErrors)
+            array('directory' => $directory, 'metadatPath' => $metadataPath, 'caPath' => $caPath, 'mailErrors' => $mailErrors, 'outputURL' => $outputURL)
         );
 
         $this->verifyDestinationDirectory($directory);
+	    $this->metadataDirectory = realpath($directory) . DIRECTORY_SEPARATOR;
+
         $this->verifyMetadataPath($metadataPath);
         $this->verifyCertPath($caPath);
 
+		if (!isset($outputURL)) {
+			$this->logger->addNotice("outputURL not set: Running Stoke without creating logo cache!");
+			$this->createLogoCache = false;
+		} else {
+			# check if URL is valid format, and add final / if needed
+			$this->outputURL=$outputURL;
+			$this->createLogoCache = true;
+		}
+		
         $metadataIndex = MetadataIndex::load($this->metadataDirectory);
         if (!$metadataIndex) {
             $this->logger->addDebug("(Re)newing caching because no metadata index yet.");
@@ -170,7 +184,7 @@ class StokeCommand extends Command
     {
         if (!file_exists($directory)) {
             $this->logger->notice("Directory '$directory' does not exist yet, creating.");
-            $isCreated = @mkdir($directory, 0700, true);
+            $isCreated = @mkdir($directory, 0755, true);
             if (!$isCreated) {
                 throw new InvalidArgumentException(
                     "'$directory' does not exist and can not be created by the current user. Try: sudo mkdir -p \"$directory\""
@@ -187,7 +201,10 @@ class StokeCommand extends Command
                 "'$directory' is not a writable path."
             );
         }
-        $this->metadataDirectory = realpath($directory) . DIRECTORY_SEPARATOR;
+        //$this->metadataDirectory = realpath($directory) . DIRECTORY_SEPARATOR;
+
+		// If I get till here the dir was created without any errors
+		return true;
     }
 
     private function verifyCertPath($certPath)
@@ -196,7 +213,10 @@ class StokeCommand extends Command
             return;
         }
 
-        $pathIsUrl = (bool) parse_url($certPath);
+        $schema = parse_url($certPath,PHP_URL_SCHEME);
+        $pathIsUrl = ($schema=='http' or $schema=='https');
+       if ($schema=='file') $certPath = parse_url($certPath, PHP_URL_PATH);
+
         if ($pathIsUrl && !ini_get('allow_url_fopen')) {
             throw new InvalidArgumentException(
                 "Unable to fetch cert from URL '$certPath' because php.ini setting 'allow_url_fopen' is set to Off"
@@ -218,7 +238,10 @@ class StokeCommand extends Command
 
     private function verifyMetadataPath($path)
     {
-        $pathIsUrl = (bool) parse_url($path);
+        $schema = parse_url($path,PHP_URL_SCHEME);
+        $pathIsUrl = ($schema=='http' or $schema=='https');
+       if ($schema=='file') $path = parse_url($path, PHP_URL_PATH);
+
         if ($pathIsUrl && !ini_get('allow_url_fopen')) {
             throw new InvalidArgumentException(
                 "Unable to fetch metadata from URL '$path' because php.ini setting 'allow_url_fopen' is set to Off"
@@ -328,6 +351,11 @@ class StokeCommand extends Command
             // Transform the XML to an Entity model.
             $entity = $this->getEntityFromXml($entityXml);
 
+			if ($this->createLogoCache) {
+				// Create a cache for the logos - (!) this involves modifying the entityXML to reflect the new logo file locations
+				$entityXml =  $this->createLogoCache($entityXml, $this->outputURL);
+			}
+
             if ($entity) {
                 $metadataIndex->addEntity($entity);
 
@@ -416,6 +444,7 @@ class StokeCommand extends Command
         $types = array();
         $displayNames = array();
 
+		// Handle IdPs
         if ($xpath->query('/md:EntityDescriptor/md:IDPSSODescriptor')->length > 0) {
             $types[] = 'idp';
             /** @var DOMNode[] $displayNameNodes */
@@ -428,6 +457,7 @@ class StokeCommand extends Command
                 $displayNames[$lang] = $content;
             }
         }
+ 
         if ($xpath->query('/md:EntityDescriptor/md:SPSSODescriptor')->length > 0) {
             $types[] = 'sp';
             /** @var DOMNode[] $displayNameNodes */
@@ -476,10 +506,133 @@ class StokeCommand extends Command
                 'displayNameEn'=>$displayNameEn
             )
         );
-
+        
         $entity = new Entity($entityId, $types, $displayNameEn, $displayNameNl);
         return $entity;
     }
+
+/**
+
+    /**
+     * This function creates a cache for the logos in entity metadata
+     * EduGain currently also supports embedded images in entity metadata which OpenConext cannot handle
+     * Embedded images will be written to file, URL based logos will be downloaded.
+     * Note that all the image will be put into the logos directory in the metadata. The logoBaseURL param must point to that directory
+     * The function return entityXML with the logo locations adapted for the cache.
+     *
+     * @param string $entityXml
+     * @param string $logoBaseURL
+     * @return $entityXml
+     * @throws RuntimeException
+     */
+    private function createLogoCache($entityXml, $logoBaseURL)
+    {
+        $document = new DOMDocument();
+        $document->loadXML($entityXml);
+
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('md', 'urn:oasis:names:tc:SAML:2.0:metadata');
+        $xpath->registerNamespace('mdui', 'urn:oasis:names:tc:SAML:metadata:ui');
+        
+        $entityIdResults = $xpath->query('/md:EntityDescriptor/@entityID');
+        if ($entityIdResults->length !== 1) {
+            throw new RuntimeException(
+                "{$entityIdResults->length} results found for an entityID attribute on: " . $entityXml
+            );
+        }
+        $entityId = $entityIdResults->item(0)->nodeValue;
+
+        $logos = array();
+
+		// Handle IdPs only
+        if ($xpath->query('/md:EntityDescriptor/md:IDPSSODescriptor')->length > 0) {
+		
+			$logoNodes = $xpath->query(
+					'/md:EntityDescriptor/md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo'
+				);
+			
+			foreach ($logoNodes as $oldLogoNode) {
+
+				$content = $oldLogoNode->textContent;
+				$logo["width"] = $oldLogoNode->attributes->getNamedItem('width')->textContent;
+				$logo["height"] = $oldLogoNode->attributes->getNamedItem('height')->textContent;
+				
+				$logoName = md5($entityId) ."_".$logo["width"]."x".$logo["height"];
+
+				// make sure the logo directory exists.
+				$logoDirectory = $this->getFilePathForLogo($entityId);	
+				$this->verifyDestinationDirectory($logoDirectory);
+
+				// handle the image
+				$contentPieces = explode(":", $content,10);
+				if ($contentPieces[0] == "data") {
+					// handle embedded image
+					$logoBlob = explode(";", $content,10);
+
+					// Calculate path
+					$logoBlobHeaderParts = explode("/", $logoBlob[0]);
+					if (isset($logoBlobHeaderParts[1])) {
+						$logoExtention = $logoBlobHeaderParts[1];
+						$logoFilename = $logoName.".".$logoExtention;
+					} else {
+						$logoFilename = $logoName;
+					}
+					$imageFileLocation = $logoDirectory . $logoFilename;
+
+					// write down blob into an image file
+					$imageData = explode(',', $content);
+					file_put_contents($imageFileLocation, base64_decode($imageData[1]));
+					
+					$this->logger->notice("Found embedded image(s) for entity ".$entityId.", converting to file at location ". $imageFileLocation);
+
+				} else {
+					// handle URL (http or https)
+					$logoLocation = $content;
+
+					$path_parts = pathinfo($logoLocation);
+					if (isset($path_parts['extension'])) {
+						$logoFilename = $logoName.".".$path_parts['extension'];
+					} else {
+						print("Woeps, image url without extension: $logoLocation\n");
+						$logoFilename = $logoName;
+					}
+					$imageFileLocation = $logoDirectory . $logoFilename;
+
+
+					// download URL and replace URL location in Metadata.
+					if ($this->urlExists($logoLocation)) {
+					  $this->downloadLargeFile($logoLocation, $imageFileLocation);
+					  $this->logger->notice("Found image URL(s) for entity ".$entityId.", saving to file at location ". $imageFileLocation);
+					} else {
+					  $this->logger->notice("WARN: Found image URL(s) for entity ".$entityId.", but could not retrieve the file at location ". $logoLocation);	
+					}
+				} 		
+				
+				// Load the $parent document fragment into the current document
+				
+				
+				$newImage = $document->createElement("mdui:Logo", $this->getURLPathForLogo($entityId).$logoFilename); 
+
+				$newImageWidth = $document->createAttribute('width');
+				$newImageHeight = $document->createAttribute('height');
+				
+				$newImageWidth->value = $oldLogoNode->attributes->getNamedItem('width')->textContent;
+				$newImageHeight->value = $oldLogoNode->attributes->getNamedItem('height')->textContent;
+
+				$newImage->appendChild($newImageWidth);
+				$newImage->appendChild($newImageHeight);
+
+				$newLogoNode = $document->importNode($newImage, true);
+
+				// Replace
+				$replacing = $oldLogoNode->parentNode->replaceChild($newLogoNode, $oldLogoNode);
+			}
+			
+		}
+		
+        return $document->saveXML();
+    }
+
 
     protected function pickDisplayName(array $displayNames, array $options)
     {
@@ -498,7 +651,29 @@ class StokeCommand extends Command
      */
     private function getFilePathForEntityId($entityId)
     {
-        $filePath = $this->metadataDirectory . md5($entityId) . '.xml';
+		$md5entityID =  md5($entityId);
+		
+        $filePath = $this->metadataDirectory  . $md5entityID . '.xml';
         return $filePath;
     }
+    
+    private function getFilePathForLogo($entityId)
+    {
+        $md5entityID =  md5($entityId);
+    
+        // Create subdirs based on the first letter of the md5 of the entityID to avoid filling the dir with too many files
+        // Note the logos are always in the logos subdir
+        $filePath = $this->metadataDirectory. "logos/" . $md5entityID[0] . "/";
+        return $filePath;
+    }
+    
+    private function getURLPathForLogo($entityId)
+    {
+        $md5entityID =  md5($entityId);
+        
+        // getFilePathForLogo() has created subdirs based on the first letter of the md5 of the entityID to avoid filling the dir with too many files
+        $filePath = $this->outputURL . "logos/" . $md5entityID[0] . "/";
+        return $filePath;
+    }
+    
 }

@@ -271,7 +271,8 @@ class StokeCommand extends Command
     {
         $metadataFile = $this->metadataDirectory . static::METADATA_LOCAL_CACHE_FILENAME;
 
-        $this->downloadLargeFile($this->metadataSourcePath, $metadataFile);
+		// Download metadata file. IF downloding fails, stop execution
+        $this->downloadLargeFile($this->metadataSourcePath, $metadataFile, TRUE);
 
         // @todo So we carefully try not to load the entire document in memory but then we have to verify
         //       the signature and because PHP has no streaming libraries for this we have to load it in memory anyway.
@@ -351,6 +352,9 @@ class StokeCommand extends Command
             // Transform the XML to an Entity model.
             $entity = $this->getEntityFromXml($entityXml);
 
+			// Filter out SAML1SSOdescriptops as we cannot handle these
+			$entityXml = $this->filterSAML1entities($entityXml);
+
 			if ($this->createLogoCache) {
 				// Create a cache for the logos - (!) this involves modifying the entityXML to reflect the new logo file locations
 				$entityXml =  $this->createLogoCache($entityXml, $this->outputURL);
@@ -385,16 +389,24 @@ class StokeCommand extends Command
         return $endTime->getTimestamp() - time();
     }
 
-    private function downloadLargeFile($from, $to)
+    private function downloadLargeFile($from, $to, $stopOnError=TRUE)
     {
         $this->logger->debug("Downloading '$from' to '$to', 4Kb at a time.");
         $rh = fopen($from, 'rb');
         if (!$rh) {
-            throw new RuntimeException("Unable to open '$from'");
+			if ($stopOnError) {
+				throw new RuntimeException("Unable to open '$from'");
+			} else {
+				$this->logger->addNotice("Unable to open '$from', but continuing as stopOnError is FALSE");
+			}
         }
         $wh = fopen($to, 'w+b');
         if (!$wh) {
-            throw new RuntimeException("Unable to open '$to'");
+			if ($stopOnError) {
+				throw new RuntimeException("Unable to open '$to'");
+			} else {
+				$this->logger->addNotice("Unable to open '$to', , but continuing as stopOnError is FALSE");
+			}
         }
 
         while (!feof($rh)) {
@@ -441,11 +453,21 @@ class StokeCommand extends Command
         }
         $entityId = $entityIdResults->item(0)->nodeValue;
 
+		//if ($entityId == "https://idp.renater.fr/idp/shibboleth") {
+		//   var_dump($entityId);
+		   
+		//   var_dump($xpath->query('/md:EntityDescriptor/md:IDPSSODescriptor'));
+		//   var_dump($xpath->query('/md:EntityDescriptor/md:IDPSSODescriptor[@protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol"]'));
+		//   var_dump($xpath->query('/md:EntityDescriptor/md:IDPSSODescriptor[contains(@protocolSupportEnumeration,"urn:oasis:names:tc:SAML:2.0:protocol")]'));
+		   
+		//   exit();
+	    //} 
+
         $types = array();
         $displayNames = array();
 
-		// Handle IdPs
-        if ($xpath->query('/md:EntityDescriptor/md:IDPSSODescriptor')->length > 0) {
+		// Handle SAML2 IdPs only
+        if ($xpath->query('/md:EntityDescriptor/md:IDPSSODescriptor[contains(@protocolSupportEnumeration,"urn:oasis:names:tc:SAML:2.0:protocol")]')->length > 0) {
             $types[] = 'idp';
             /** @var DOMNode[] $displayNameNodes */
             $displayNameNodes = $xpath->query(
@@ -544,8 +566,8 @@ class StokeCommand extends Command
 
         $logos = array();
 
-		// Handle IdPs only
-        if ($xpath->query('/md:EntityDescriptor/md:IDPSSODescriptor')->length > 0) {
+		// Handle SAML2 IdPs only
+        if ($xpath->query('/md:EntityDescriptor/md:IDPSSODescriptor[contains(@protocolSupportEnumeration,"urn:oasis:names:tc:SAML:2.0:protocol")]')->length > 0) {
 		
 			$logoNodes = $xpath->query(
 					'/md:EntityDescriptor/md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo'
@@ -601,7 +623,7 @@ class StokeCommand extends Command
 
 					// download URL and replace URL location in Metadata.
 					if ($this->urlExists($logoLocation)) {
-					  $this->downloadLargeFile($logoLocation, $imageFileLocation);
+					  $this->downloadLargeFile($logoLocation, $imageFileLocation, FALSE);
 					  $this->logger->notice("Found image URL(s) for entity ".$entityId.", saving to file at location ". $imageFileLocation);
 					} else {
 					  $this->logger->notice("WARN: Found image URL(s) for entity ".$entityId.", but could not retrieve the file at location ". $logoLocation);	
@@ -628,6 +650,29 @@ class StokeCommand extends Command
 				$replacing = $oldLogoNode->parentNode->replaceChild($newLogoNode, $oldLogoNode);
 			}
 			
+		}
+        return $document->saveXML();
+    }
+
+    private function filterSAML1entities($entityXml)
+    {
+        $document = new DOMDocument();
+        $document->loadXML($entityXml);
+
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('md', 'urn:oasis:names:tc:SAML:2.0:metadata');
+        $xpath->registerNamespace('mdui', 'urn:oasis:names:tc:SAML:metadata:ui');
+
+		// Handle SAML2 IdPs only, so remove SAML1 entity data 
+		// [@protocolSupportEnumeration="urn:oasis:names:tc:SAML:1.1:protocol urn:mace:shibboleth:1.0"]
+		
+        if ($xpath->query('/md:EntityDescriptor/md:IDPSSODescriptor[@protocolSupportEnumeration="urn:oasis:names:tc:SAML:1.1:protocol urn:mace:shibboleth:1.0"]')->length > 0) {
+			$IDPSSODescriptors =  $xpath->query('/md:EntityDescriptor/md:IDPSSODescriptor');
+			foreach ($IDPSSODescriptors as $IDPSSODescriptor) {
+				if ($IDPSSODescriptor->getAttribute('protocolSupportEnumeration') == "urn:oasis:names:tc:SAML:1.1:protocol urn:mace:shibboleth:1.0") {
+					$IDPSSODescriptor->parentNode->removeChild($IDPSSODescriptor);
+				}
+			}
 		}
 		
         return $document->saveXML();

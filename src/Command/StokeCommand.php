@@ -213,7 +213,10 @@ class StokeCommand extends Command
             return;
         }
 
-        $pathIsUrl = (bool) parse_url($certPath);
+        $schema = parse_url($certPath,PHP_URL_SCHEME);
+        $pathIsUrl = ($schema=='http' or $schema=='https');
+       if ($schema=='file') $certPath = parse_url($certPath, PHP_URL_PATH);
+
         if ($pathIsUrl && !ini_get('allow_url_fopen')) {
             throw new InvalidArgumentException(
                 "Unable to fetch cert from URL '$certPath' because php.ini setting 'allow_url_fopen' is set to Off"
@@ -235,7 +238,10 @@ class StokeCommand extends Command
 
     private function verifyMetadataPath($path)
     {
-        $pathIsUrl = (bool) parse_url($path);
+        $schema = parse_url($path,PHP_URL_SCHEME);
+        $pathIsUrl = ($schema=='http' or $schema=='https');
+       if ($schema=='file') $path = parse_url($path, PHP_URL_PATH);
+
         if ($pathIsUrl && !ini_get('allow_url_fopen')) {
             throw new InvalidArgumentException(
                 "Unable to fetch metadata from URL '$path' because php.ini setting 'allow_url_fopen' is set to Off"

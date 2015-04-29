@@ -7,6 +7,7 @@
         "psr-4": { "OpenConext\\Stoker\\": "src/" }
     },
     "require": {
+        "ext-curl": "*",
         "cilex/cilex": "~1.1",
         "ass/xmlsecurity": "~1.1",
         "monolog/monolog": "~1.10",

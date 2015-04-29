@@ -391,41 +391,66 @@ class StokeCommand extends Command
 
     private function downloadLargeFile($from, $to, $stopOnError=TRUE)
     {
-        $this->logger->debug("Downloading '$from' to '$to', 4Kb at a time.");
-        $rh = fopen($from, 'rb');
-        if (!$rh) {
-			if ($stopOnError) {
-				throw new RuntimeException("Unable to open '$from'");
-			} else {
-				$this->logger->addNotice("Unable to open '$from', but continuing as stopOnError is FALSE");
-			}
+        $this->logger->debug("Downloading '$from' to '$to'");
+
+        $curl = curl_init();
+        curl_setopt($curl, CURLOPT_FAILONERROR,true);
+        curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curl, CURLOPT_NOBODY, false);
+        curl_setopt($curl, CURLOPT_HEADER, false);
+        curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 1);
+        curl_setopt($curl, CURLOPT_TIMEOUT, 30);
+        curl_setopt($curl, CURLOPT_URL, $from);
+        $content = @curl_exec($curl);
+
+        $error = curl_errno($curl);
+        if ($error) {
+            $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            if ($stopOnError) {
+                throw new RuntimeException("Unable to open '$from' ('$error',$status)");
+            } else {
+                $this->logger->addNotice("Unable to open '$from' ('$error',$status), but continuing as stopOnError is FALSE");
+            }
         }
+
         $wh = fopen($to, 'w+b');
         if (!$wh) {
-			if ($stopOnError) {
-				throw new RuntimeException("Unable to open '$to'");
-			} else {
-				$this->logger->addNotice("Unable to open '$to', , but continuing as stopOnError is FALSE");
-			}
-        }
-
-        while ($rh and $wh and !feof($rh)) {
-            if (fwrite($wh, fread($rh, 4096)) === FALSE) {
-                return false;
+            if ($stopOnError) {
+                throw new RuntimeException("Unable to open '$to'");
+            } else {
+                $this->logger->addNotice("Unable to open '$to', , but continuing as stopOnError is FALSE");
             }
-            flush();
         }
 
-        fclose($rh);
+        if (fwrite($wh,$content) === FALSE) {
+            return false;
+        }
+        flush();
+
+        curl_close($curl);
         fclose($wh);
         return true;
     }
 
     private function urlExists($url)
     {
-        $headers = @get_headers($url);
-        $this->logger->debug("When checking if '$url' exists it gave '{$headers[0]}'");
-        return (bool) preg_match("|200|", $headers[0]);
+        $curl = curl_init($url);
+        curl_setopt($curl, CURLOPT_FAILONERROR,true);
+        curl_setopt($curl, CURLOPT_NOBODY, true);
+        curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 1);
+        curl_setopt($curl, CURLOPT_TIMEOUT, 30);
+
+        $result = curl_exec($curl);
+
+        $error = curl_errno($curl);
+        if ($error or $result===false) {
+            $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            $this->logger->debug("When checking if '$url' exists it gave '{$error},{$status}'");
+            return false;
+        }
+        return true;
     }
 
     /**

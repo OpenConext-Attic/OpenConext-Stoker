@@ -409,7 +409,7 @@ class StokeCommand extends Command
 			}
         }
 
-        while (!feof($rh)) {
+        while ($rh and $wh and !feof($rh)) {
             if (fwrite($wh, fread($rh, 4096)) === FALSE) {
                 return false;
             }

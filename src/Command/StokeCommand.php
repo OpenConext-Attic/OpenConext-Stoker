@@ -558,8 +558,6 @@ class StokeCommand extends Command
         return $entity;
     }
 
-/**
-
     /**
      * This function creates a cache for the logos in entity metadata
      * EduGain currently also supports embedded images in entity metadata which OpenConext cannot handle
